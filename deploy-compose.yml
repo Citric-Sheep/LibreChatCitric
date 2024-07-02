@@ -49,8 +49,7 @@ services:
       - /etc/letsencrypt/archive/chat.citricsheep.com:/etc/letsencrypt/archive/chat.citricsheep.com
       - /etc/letsencrypt/options-ssl-nginx.conf:/etc/letsencrypt/options-ssl-nginx.conf
       - /etc/letsencrypt/ssl-dhparams.pem:/etc/letsencrypt/ssl-dhparams.pem
-    networks:
-      - chat-network
+
   mongodb:
     container_name: chat-mongodb
     # ports:  # Uncomment this to access mongodb from outside docker, not safe in deployment
@@ -73,8 +72,7 @@ services:
       - MEILI_NO_ANALYTICS=true
     volumes:
       - ./meili_data_v1.7:/meili_data
-    networks:
-      - chat-network
+
   vectordb:
     image: ankane/pgvector:latest
     environment:
@@ -84,8 +82,7 @@ services:
     restart: always
     volumes:
       - pgdata2:/var/lib/postgresql/data
-    networks:
-      - chat-network
+
   rag_api:
     image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:latest
     environment:
@@ -96,11 +93,7 @@ services:
       - vectordb
     env_file:
       - .env
-    networks:
-      - chat-network
+
 
 volumes:
   pgdata2:
-
-networks:
-  chat-network:
