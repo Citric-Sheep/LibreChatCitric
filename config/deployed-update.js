@@ -26,9 +26,10 @@ const shouldRebase = process.argv.includes('--rebase');
   execSync('git fetch origin', { stdio: 'inherit' });
 
   if (!shouldRebase) {
-    execSync('git checkout main', { stdio: 'inherit' });
-    console.purple('Pulling the latest code from main...');
-    execSync('git pull origin main', { stdio: 'inherit' });
+    const currentBranch = getCurrentBranch();
+    execSync(`git checkout ${currentBranch}`, { stdio: 'inherit' });
+    console.purple('Pulling the latest code from ${currentBranch}...');
+    execSync('git pull origin ${currentBranch}', { stdio: 'inherit' });
   } else if (shouldRebase) {
     const currentBranch = getCurrentBranch();
     console.purple(`Rebasing ${currentBranch} onto main...`);
