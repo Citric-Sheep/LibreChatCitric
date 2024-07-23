@@ -15,7 +15,6 @@ function getCurrentBranch() {
 }
 
 const shouldRebase = process.argv.includes('--rebase');
-const noRebase = process.argv.includes('--no-rebase');
 
 (async () => {
   console.green(
@@ -26,7 +25,7 @@ const noRebase = process.argv.includes('--no-rebase');
   console.purple('Fetching the latest repo...');
   execSync('git fetch origin', { stdio: 'inherit' });
 
-  if (!shouldRebase || noRebase) {
+  if (!shouldRebase) {
     const currentBranch = getCurrentBranch();
     execSync(`git checkout ${currentBranch}`, { stdio: 'inherit' });
     console.purple('Pulling the latest code from ${currentBranch}...');
