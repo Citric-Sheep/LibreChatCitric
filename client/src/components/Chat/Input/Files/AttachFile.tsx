@@ -1,36 +1,20 @@
 import React from 'react';
-import {
-  EModelEndpoint,
-  supportsFiles,
-  fileConfig as defaultFileConfig,
-  mergeFileConfig,
-} from 'librechat-data-provider';
-import { useGetFileConfig } from '~/data-provider';
+import { FileUpload, TooltipAnchor } from '~/components/ui';
 import { AttachmentIcon } from '~/components/svg';
-import { FileUpload } from '~/components/ui';
-import { useFileHandling } from '~/hooks';
+import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
 const AttachFile = ({
-  endpoint,
-  endpointType,
   isRTL,
-  disabled = false,
+  disabled,
+  handleFileChange,
 }: {
-  endpoint: EModelEndpoint | '';
-  endpointType?: EModelEndpoint;
   isRTL: boolean;
   disabled?: boolean | null;
+  handleFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }) => {
-  const { handleFileChange } = useFileHandling();
-  const { data: fileConfig = defaultFileConfig } = useGetFileConfig({
-    select: (data) => mergeFileConfig(data),
-  });
-  const endpointFileConfig = fileConfig.endpoints[endpoint ?? ''];
-
-  if (!supportsFiles[endpointType ?? endpoint ?? ''] || endpointFileConfig?.disabled) {
-    return null;
-  }
+  const localize = useLocalize();
+  const isUploadDisabled = disabled ?? false;
 
   return (
     <div
@@ -42,18 +26,18 @@ const AttachFile = ({
       )}
     >
       <FileUpload handleFileChange={handleFileChange} className="flex">
-        <button
-          disabled={!!disabled}
-          type="button"
-          tabIndex={1}
-          className="btn relative p-0 text-black dark:text-white"
-          aria-label="Attach files"
+        <TooltipAnchor
+          id="audio-recorder"
+          disabled={isUploadDisabled}
+          aria-label={localize('com_sidepanel_attach_files')}
+          className="btn relative text-black focus:outline-none focus:ring-2 focus:ring-border-xheavy focus:ring-opacity-50 dark:text-white"
           style={{ padding: 0 }}
+          description={localize('com_sidepanel_attach_files')}
         >
           <div className="flex w-full items-center justify-center gap-2">
             <AttachmentIcon />
           </div>
-        </button>
+        </TooltipAnchor>
       </FileUpload>
     </div>
   );

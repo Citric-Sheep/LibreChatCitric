@@ -1,4 +1,4 @@
-import { memo, useRef, useMemo } from 'react';
+import { memo, useRef, useMemo, useEffect } from 'react';
 import { useRecoilState, useRecoilValue } from 'recoil';
 import {
   supportsFiles,
@@ -8,40 +8,42 @@ import {
 } from 'librechat-data-provider';
 import {
   useChatContext,
+  useChatFormContext,
   useAddedChatContext,
   useAssistantsMapContext,
-  useChatFormContext,
 } from '~/Providers';
 import {
   useTextarea,
   useAutoSave,
   useRequiresKey,
   useHandleKeyUp,
+  useQueryParams,
   useSubmitMessage,
 } from '~/hooks';
+import FileFormWrapper from './Files/FileFormWrapper';
 import { TextareaAutosize } from '~/components/ui';
 import { useGetFileConfig } from '~/data-provider';
 import { cn, removeFocusRings } from '~/utils';
 import TextareaHeader from './TextareaHeader';
 import PromptsCommand from './PromptsCommand';
-import AttachFile from './Files/AttachFile';
 import AudioRecorder from './AudioRecorder';
 import { mainTextareaId } from '~/common';
 import StreamAudio from './StreamAudio';
 import StopButton from './StopButton';
 import SendButton from './SendButton';
-import FileRow from './Files/FileRow';
 import Mention from './Mention';
 import store from '~/store';
 
 const ChatForm = ({ index = 0 }) => {
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null);
+  useQueryParams({ textAreaRef });
 
-  const SpeechToText = useRecoilState<boolean>(store.speechToText);
-  const TextToSpeech = useRecoilState<boolean>(store.textToSpeech);
+  const SpeechToText = useRecoilValue(store.speechToText);
+  const TextToSpeech = useRecoilValue(store.textToSpeech);
   const automaticPlayback = useRecoilValue(store.automaticPlayback);
 
+  const isSearching = useRecoilValue(store.isSearching);
   const [showStopButton, setShowStopButton] = useRecoilState(store.showStopButtonByIndex(index));
   const [showPlusPopover, setShowPlusPopover] = useRecoilState(store.showPlusPopoverFamily(index));
   const [showMentionPopover, setShowMentionPopover] = useRecoilState(
@@ -61,7 +63,7 @@ const ChatForm = ({ index = 0 }) => {
   const { handlePaste, handleKeyDown, handleCompositionStart, handleCompositionEnd } = useTextarea({
     textAreaRef,
     submitButtonRef,
-    disabled: !!requiresKey,
+    disabled: !!(requiresKey ?? false),
   });
 
   const {
@@ -70,7 +72,6 @@ const ChatForm = ({ index = 0 }) => {
     conversation,
     isSubmitting,
     filesLoading,
-    setFilesLoading,
     newConversation,
     handleStopGenerating,
   } = useChatContext();
@@ -105,12 +106,12 @@ const ChatForm = ({ index = 0 }) => {
   const invalidAssistant = useMemo(
     () =>
       isAssistantsEndpoint(conversation?.endpoint) &&
-      (!conversation?.assistant_id ||
-        !assistantMap?.[conversation?.endpoint ?? '']?.[conversation?.assistant_id ?? '']),
+      (!(conversation?.assistant_id ?? '') ||
+        !assistantMap?.[conversation?.endpoint ?? ''][conversation?.assistant_id ?? '']),
     [conversation?.assistant_id, conversation?.endpoint, assistantMap],
   );
   const disableInputs = useMemo(
-    () => !!(requiresKey || invalidAssistant),
+    () => !!((requiresKey ?? false) || invalidAssistant),
     [requiresKey, invalidAssistant],
   );
 
@@ -120,6 +121,15 @@ const ChatForm = ({ index = 0 }) => {
       methods.setValue('text', e.target.value, { shouldValidate: true });
     },
   });
+
+  useEffect(() => {
+    if (!isSearching && textAreaRef.current && !disableInputs) {
+      textAreaRef.current.focus();
+    }
+  }, [isSearching, disableInputs]);
+
+  const endpointSupportsFiles: boolean = supportsFiles[endpointType ?? endpoint ?? ''] ?? false;
+  const isUploadDisabled: boolean = endpointFileConfig?.disabled ?? false;
 
   return (
     <form
@@ -134,7 +144,7 @@ const ChatForm = ({ index = 0 }) => {
               newConversation={generateConversation}
               textAreaRef={textAreaRef}
               commandChar="+"
-              placeholder="com_ui_add"
+              placeholder="com_ui_add_model_preset"
               includeAssistants={false}
             />
           )}
@@ -148,53 +158,37 @@ const ChatForm = ({ index = 0 }) => {
           <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
           <div className="bg-token-main-surface-primary relative flex w-full flex-grow flex-col overflow-hidden rounded-2xl border dark:border-gray-600 dark:text-white [&:has(textarea:focus)]:border-gray-300 [&:has(textarea:focus)]:shadow-[0_2px_6px_rgba(0,0,0,.05)] dark:[&:has(textarea:focus)]:border-gray-500">
             <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
-            <FileRow
-              files={files}
-              setFiles={setFiles}
-              setFilesLoading={setFilesLoading}
-              isRTL={isRTL}
-              Wrapper={({ children }) => (
-                <div className="mx-2 mt-2 flex flex-wrap gap-2 px-2.5 md:pl-0 md:pr-4">
-                  {children}
-                </div>
+            <FileFormWrapper disableInputs={disableInputs}>
+              {endpoint && (
+                <TextareaAutosize
+                  {...registerProps}
+                  ref={(e) => {
+                    ref(e);
+                    textAreaRef.current = e;
+                  }}
+                  disabled={disableInputs}
+                  onPaste={handlePaste}
+                  onKeyDown={handleKeyDown}
+                  onKeyUp={handleKeyUp}
+                  onCompositionStart={handleCompositionStart}
+                  onCompositionEnd={handleCompositionEnd}
+                  id={mainTextareaId}
+                  tabIndex={0}
+                  data-testid="text-input"
+                  style={{ height: 44, overflowY: 'auto' }}
+                  rows={1}
+                  className={cn(
+                    endpointSupportsFiles && !isUploadDisabled
+                      ? 'pl-10 md:pl-[55px]'
+                      : 'pl-3 md:pl-4',
+                    'm-0 w-full resize-none border-0 bg-transparent py-[10px] placeholder-black/50 focus:ring-0 focus-visible:ring-0 dark:bg-transparent dark:placeholder-white/50 md:py-3.5  ',
+                    SpeechToText && !isRTL ? 'pr-20 md:pr-[85px]' : 'pr-10 md:pr-12',
+                    'max-h-[65vh] md:max-h-[75vh]',
+                    removeFocusRings,
+                  )}
+                />
               )}
-            />
-            {endpoint && (
-              <TextareaAutosize
-                {...registerProps}
-                autoFocus
-                ref={(e) => {
-                  ref(e);
-                  textAreaRef.current = e;
-                }}
-                disabled={disableInputs}
-                onPaste={handlePaste}
-                onKeyDown={handleKeyDown}
-                onKeyUp={handleKeyUp}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
-                id={mainTextareaId}
-                tabIndex={0}
-                data-testid="text-input"
-                style={{ height: 44, overflowY: 'auto' }}
-                rows={1}
-                className={cn(
-                  supportsFiles[endpointType ?? endpoint ?? ''] && !endpointFileConfig?.disabled
-                    ? ' pl-10 md:pl-[55px]'
-                    : 'pl-3 md:pl-4',
-                  'm-0 w-full resize-none border-0 bg-transparent py-[10px] placeholder-black/50 focus:ring-0 focus-visible:ring-0 dark:bg-transparent dark:placeholder-white/50 md:py-3.5  ',
-                  SpeechToText && !isRTL ? 'pr-20 md:pr-[85px]' : 'pr-10 md:pr-12',
-                  'max-h-[65vh] md:max-h-[75vh]',
-                  removeFocusRings,
-                )}
-              />
-            )}
-            <AttachFile
-              endpoint={_endpoint ?? ''}
-              endpointType={endpointType}
-              isRTL={isRTL}
-              disabled={disableInputs}
-            />
+            </FileFormWrapper>
             {(isSubmitting || isSubmittingAdded) && (showStopButton || showStopAdded) ? (
               <StopButton
                 stop={handleStopGenerating}
